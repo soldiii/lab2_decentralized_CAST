@@ -11,26 +11,21 @@ import (
 )
 
 func ReadFromClient(cypher *cast5.Cipher, conn net.Conn, logger *log.Logger) {
-	// Будем прослушивать все сообщения разделенные \n
-	input := make([]byte, 256)
-	n, err := conn.Read(input)
-	if n == 0 || err != nil {
-		fmt.Println("Read error:", err)
-		return
-	}
+	message, _ := bufio.NewReader(conn).ReadString('\n')
+	message = message[0 : len(message)-1]
 	const blockSize = cast5.BlockSize
 	var decrypted_text []byte
-	for i := 0; i < len(input); i += blockSize {
+	for i := 0; i < len([]byte(message)); i += blockSize {
 		var block [blockSize]byte
-		cypher.Decrypt(block[:], input[i:])
+		cypher.Decrypt(block[:], []byte(message)[i:])
 		for i := 0; i < len(block); i++ {
 			decrypted_text = append(decrypted_text, block[i])
 		}
 	}
 	dText, _ := hex.DecodeString(string(decrypted_text[:]))
 	// Распечатываем полученое сообщение
-	logger.Printf("Полученное зашифрованное сообщение: %s", string(input))
-	logger.Printf("Расшифрованное сообщение:%s", string(dText))
+	logger.Printf("Полученное зашифрованное сообщение: %s", hex.EncodeToString([]byte(message)))
+	logger.Printf("Расшифрованное сообщение: %s", dText)
 
 }
 func WriteToClient(cypher *cast5.Cipher, conn net.Conn, logger *log.Logger) {
@@ -60,8 +55,8 @@ func WriteToClient(cypher *cast5.Cipher, conn net.Conn, logger *log.Logger) {
 			encrypted_text = append(encrypted_text, block[i])
 		}
 	}
-	logger.Printf("Введенное сообщение: %s\n", text)
-	logger.Printf("Зашифрованное сообщение: %s\n", string(encrypted_text[:]))
+	logger.Printf("Введенное сообщение: %s", text)
+	logger.Printf("Зашифрованное сообщение: %s\n", hex.EncodeToString(encrypted_text))
 	encrypted_text = append(encrypted_text, '\n')
 	// Отправляем в socket
 	conn.Write(encrypted_text)
@@ -91,7 +86,7 @@ func main() {
 		log.Println(err)
 	}
 	defer f.Close()
-	logger := log.New(f, "префикс: ", log.LstdFlags)
+	logger := log.New(f, "Host2: ", log.LstdFlags)
 	for {
 		ReadFromClient(cypher, conn, logger)
 		WriteToClient(cypher, conn, logger)
